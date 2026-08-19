@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#05070a" />
+    <title>Flow Injection</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="stage">
+      <canvas id="canvas" aria-label="Webcam-driven GPU particle field"></canvas>
+      <video id="camera" playsinline muted aria-hidden="true"></video>
+
+      <header class="masthead">
+        <div>
+          <p class="eyebrow">WebGPU experiment</p>
+          <h1>Flow Injection</h1>
+        </div>
+        <output id="fps" class="metric">— fps</output>
+      </header>
+
+      <section id="status" class="status" role="status">
+        <p id="status-title">Preparing the GPU…</p>
+        <p id="status-detail">This demo needs WebGPU and optional camera access.</p>
+        <button id="retry" type="button" hidden>Try again</button>
+      </section>
+
+      <aside class="controls" aria-label="Particle controls">
+        <button id="controls-toggle" class="controls-toggle" type="button" aria-expanded="true">
+          Tune
+        </button>
+        <div id="controls-body" class="controls-body"></div>
+      </aside>
+
+      <footer class="caption">
+        <span><span id="particle-count">262,144 particles</span> · <span id="camera-state">camera pending</span></span>
+        <span>one encoder · one submit</span>
+      </footer>
+    </main>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
