@@ -12,7 +12,8 @@ struct Frame {
 }
 
 @group(0) @binding(0) var camera: texture_external;
-@group(0) @binding(1) var<uniform> frame: Frame;
+@group(0) @binding(1) var camera_sampler: sampler;
+@group(0) @binding(2) var<uniform> frame: Frame;
 
 struct VertexOutput {
   @builtin(position) position: vec4<f32>,
@@ -33,7 +34,7 @@ fn vs(@builtin(vertex_index) index: u32) -> VertexOutput {
 
 @fragment
 fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
-  let sample = textureSampleBaseClampToEdge(camera, input.uv);
+  let sample = textureSampleBaseClampToEdge(camera, camera_sampler, input.uv);
   let luminance = dot(sample.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
   let tint = vec3<f32>(0.18, 0.34, 0.31) * luminance;
   return vec4<f32>(tint * frame.camera_opacity, 1.0);

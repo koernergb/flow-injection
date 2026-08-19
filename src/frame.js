@@ -20,9 +20,16 @@ export async function createRenderer({ device, context, format, video, particleC
   }));
   seedParticles(device, particleBuffers, particleCount);
 
-  const computeModule = shaderModule(device, "ambient compute", computeSource);
-  const drawModule = shaderModule(device, "particle draw", drawSource);
-  const cameraModule = shaderModule(device, "camera background", cameraSource);
+  const [computeModule, drawModule, cameraModule] = await Promise.all([
+    checkedShaderModule(device, "ambient compute", computeSource),
+    checkedShaderModule(device, "particle draw", drawSource),
+    checkedShaderModule(device, "camera background", cameraSource),
+  ]);
+  const cameraSampler = device.createSampler({
+    label: "camera linear sampler",
+    magFilter: "linear",
+    minFilter: "linear",
+  });
 
   const computePipeline = device.createComputePipeline({
     label: "ambient particle update",
@@ -108,7 +115,8 @@ export async function createRenderer({ device, context, format, video, particleC
           layout: cameraPipeline.getBindGroupLayout(0),
           entries: [
             { binding: 0, resource: device.importExternalTexture({ source: video }) },
-            { binding: 1, resource: { buffer: uniformBuffer } },
+            { binding: 1, resource: cameraSampler },
+            { binding: 2, resource: { buffer: uniformBuffer } },
           ],
         });
         render.setPipeline(cameraPipeline);
@@ -137,8 +145,15 @@ async function loadShader(url) {
   return response.text();
 }
 
-function shaderModule(device, label, code) {
-  return device.createShaderModule({ label, code });
+async function checkedShaderModule(device, label, code) {
+  const module = device.createShaderModule({ label, code });
+  const info = await module.getCompilationInfo();
+  const errors = info.messages.filter((message) => message.type === "error");
+  if (errors.length > 0) {
+    const details = errors.map((message) => `${message.lineNum}:${message.linePos} ${message.message}`).join("\n");
+    throw new Error(`${label} shader failed to compile:\n${details}`);
+  }
+  return module;
 }
 
 function seedParticles(device, buffers, count) {

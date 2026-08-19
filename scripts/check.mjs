@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 const files = [
-  "index.html", "styles.css", "src/main.js", "src/camera.js", "src/gpu.js",
+  "index.html", "styles.css", "favicon.svg", "src/main.js", "src/camera.js", "src/gpu.js",
   "src/frame.js", "src/params.js", "src/shaders/ambient.wgsl",
   "src/shaders/draw.wgsl", "src/shaders/camera.wgsl",
 ];
@@ -16,6 +16,11 @@ if (submitCount !== 1 || encoderCount !== 1) {
 }
 if (!frame.includes("beginComputePass") || !frame.includes("beginRenderPass")) {
   throw new Error("frame.js must encode both compute and render passes");
+}
+
+const cameraShader = readFileSync("src/shaders/camera.wgsl", "utf8");
+if (!cameraShader.includes("texture_external") || !cameraShader.includes("camera_sampler")) {
+  throw new Error("camera shader must bind both an external texture and its sampler");
 }
 
 for (const file of files.filter((name) => name.endsWith(".js"))) {
