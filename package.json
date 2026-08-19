@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node scripts/serve.mjs",
     "check": "node scripts/check.mjs",
+    "test": "node scripts/test-flow.mjs",
     "build": "node scripts/build.mjs"
   }
 }

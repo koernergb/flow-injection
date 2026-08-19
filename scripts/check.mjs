@@ -3,8 +3,10 @@ import { spawnSync } from "node:child_process";
 
 const files = [
   "index.html", "styles.css", "favicon.svg", "src/main.js", "src/camera.js", "src/gpu.js",
-  "src/frame.js", "src/params.js", "src/shaders/ambient.wgsl",
-  "src/shaders/draw.wgsl", "src/shaders/camera.wgsl",
+  "src/frame.js", "src/params.js", "src/shaders/advect.wgsl",
+  "src/shaders/draw.wgsl", "src/shaders/preprocess.wgsl",
+  "src/shaders/downsample.wgsl", "src/shaders/lk.wgsl",
+  "src/shaders/flow_post.wgsl", "src/shaders/flow_debug.wgsl",
 ];
 for (const file of files) readFileSync(file, "utf8");
 
@@ -18,9 +20,9 @@ if (!frame.includes("beginComputePass") || !frame.includes("beginRenderPass")) {
   throw new Error("frame.js must encode both compute and render passes");
 }
 
-const cameraShader = readFileSync("src/shaders/camera.wgsl", "utf8");
-if (!cameraShader.includes("texture_external") || !cameraShader.includes("camera_sampler")) {
-  throw new Error("camera shader must bind both an external texture and its sampler");
+const preprocessShader = readFileSync("src/shaders/preprocess.wgsl", "utf8");
+if (!preprocessShader.includes("texture_external") || !preprocessShader.includes("camera_sampler")) {
+  throw new Error("preprocess shader must bind both an external texture and its sampler");
 }
 
 for (const file of files.filter((name) => name.endsWith(".js"))) {
@@ -28,4 +30,4 @@ for (const file of files.filter((name) => name.endsWith(".js"))) {
   if (result.status !== 0) throw new Error(result.stderr);
 }
 
-process.stdout.write("M0 structural checks passed.\n");
+process.stdout.write("M1 structural checks passed.\n");

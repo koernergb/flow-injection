@@ -1,19 +1,23 @@
-struct Frame {
+struct FlowFrame {
   dt: f32,
   time: f32,
   aspect: f32,
   point_size: f32,
   ambient: f32,
   damping: f32,
-  camera_opacity: f32,
+  flow_gain: f32,
   particle_count: f32,
   resolution: vec2<f32>,
-  _pad: vec2<f32>,
+  flow_resolution: vec2<f32>,
+  flow_smoothing: f32,
+  flow_clamp: f32,
+  confidence_threshold: f32,
+  debug_mode: f32,
 }
 
 @group(0) @binding(0) var camera: texture_external;
 @group(0) @binding(1) var camera_sampler: sampler;
-@group(0) @binding(2) var<uniform> frame: Frame;
+@group(0) @binding(2) var<uniform> frame: FlowFrame;
 
 struct VertexOutput {
   @builtin(position) position: vec4<f32>,
@@ -25,17 +29,16 @@ fn vs(@builtin(vertex_index) index: u32) -> VertexOutput {
   let positions = array<vec2<f32>, 3>(
     vec2<f32>(-1.0, -1.0), vec2<f32>(3.0, -1.0), vec2<f32>(-1.0, 3.0),
   );
-  let position = positions[index];
+  let p = positions[index];
   var output: VertexOutput;
-  output.position = vec4<f32>(position, 0.0, 1.0);
-  output.uv = vec2<f32>(1.0 - position.x * 0.5 - 0.5, position.y * -0.5 + 0.5);
+  output.position = vec4<f32>(p, 0.0, 1.0);
+  output.uv = vec2<f32>(1.0 - (p.x * 0.5 + 0.5), p.y * -0.5 + 0.5);
   return output;
 }
 
 @fragment
 fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
-  let sample = textureSampleBaseClampToEdge(camera, camera_sampler, input.uv);
-  let luminance = dot(sample.rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
-  let tint = vec3<f32>(0.18, 0.34, 0.31) * luminance;
-  return vec4<f32>(tint * frame.camera_opacity, 1.0);
+  let rgb = textureSampleBaseClampToEdge(camera, camera_sampler, input.uv).rgb;
+  let gray = dot(rgb, vec3<f32>(0.2126, 0.7152, 0.0722));
+  return vec4<f32>(gray, gray, gray, 1.0);
 }

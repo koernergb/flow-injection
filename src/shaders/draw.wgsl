@@ -5,10 +5,14 @@ struct Frame {
   point_size: f32,
   ambient: f32,
   damping: f32,
-  camera_opacity: f32,
+  flow_gain: f32,
   particle_count: f32,
   resolution: vec2<f32>,
-  _pad: vec2<f32>,
+  flow_resolution: vec2<f32>,
+  flow_smoothing: f32,
+  flow_clamp: f32,
+  confidence_threshold: f32,
+  debug_mode: f32,
 }
 
 struct Particle {
@@ -56,5 +60,5 @@ fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
   let shape = max(0.0, 1.0 - dot(input.local, input.local));
   let intensity = shape * (0.12 + min(input.speed * 10.0, 0.55));
   let color = mix(vec3<f32>(0.25, 0.78, 0.68), vec3<f32>(0.78, 1.0, 0.91), min(input.speed * 12.0, 1.0));
-  return vec4<f32>(color * intensity, intensity);
+  return vec4<f32>(color, intensity);
 }

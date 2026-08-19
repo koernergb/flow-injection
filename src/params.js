@@ -1,16 +1,24 @@
 export const defaults = Object.freeze({
   particleCount: 262_144,
   pointSize: 2.2,
-  ambient: 0.34,
+  ambient: 0.12,
   damping: 0.965,
-  cameraOpacity: 0.12,
+  flowGain: 1.8,
+  flowSmoothing: 0.7,
+  flowClamp: 14,
+  confidenceThreshold: 0.015,
+  showFlow: 0,
 });
 
 const definitions = [
   ["pointSize", "Particle size", 0.8, 5, 0.1],
   ["ambient", "Ambient motion", 0, 1, 0.01],
   ["damping", "Damping", 0.85, 0.995, 0.001],
-  ["cameraOpacity", "Camera ghost", 0, 0.4, 0.01],
+  ["flowGain", "Camera force", 0, 5, 0.05],
+  ["flowSmoothing", "Flow smoothing", 0, 0.95, 0.01],
+  ["flowClamp", "Flow clamp", 2, 30, 0.5],
+  ["confidenceThreshold", "Confidence", 0, 0.1, 0.001],
+  ["showFlow", "Flow debug", 0, 1, 1],
 ];
 
 export function createControls(container, initial = defaults) {
@@ -38,6 +46,7 @@ export function createControls(container, initial = defaults) {
 }
 
 function format(key, value) {
-  if (key === "damping") return value.toFixed(3);
+  if (key === "damping" || key === "confidenceThreshold") return value.toFixed(3);
+  if (key === "showFlow") return value > 0 ? "on" : "off";
   return value.toFixed(2);
 }
