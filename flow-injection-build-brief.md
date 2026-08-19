@@ -1,5 +1,13 @@
 # Flow Injection — Build Brief
 
+> **Implementation control:** This brief defines the product and technical
+> direction. Execute it through [MILESTONES.md](./MILESTONES.md). Decisions that
+> require visual taste, real-device observation, scope ownership, licensing,
+> spending, benchmark verification, or publication are reserved for a human as
+> described in [HUMAN_JUDGMENT.md](./HUMAN_JUDGMENT.md). At every labeled human
+> gate, an implementation agent must pause and receive explicit approval before
+> continuing dependent work.
+
 **Working name:** `flowfield` (or `advect`)
 
 **One-line pitch:** Optical flow computed and consumed inside a single WebGPU command encoder — the flow field never leaves the GPU, it becomes the velocity field for half a million particles in the same frame.
@@ -36,6 +44,11 @@ Ping-pong two particle buffers (read A, write B, swap) and two flow textures (pr
 
 **Phase 1 — classical (week 1).** Pyramidal Lucas–Kanade, entirely in WGSL. No model, no weights, no training. This gets you a working, beautiful, postable demo in days rather than weeks, and it de-risks everything downstream: if the particles look bad, you'll know it's the advection or the masking, not the network.
 
+Before flow work begins, the M0 visual-foundation human gate must be approved.
+After classical flow is functional, agents must pause for the M1A real-camera
+flow-quality review and M1B aesthetic review. Automated tests and debug views do
+not replace these reviews.
+
 - 4-level Gaussian pyramid, coarse-to-fine
 - Per level: solve the 2×2 LK system per pixel over a 7×7 window using image gradients, warp by the upsampled coarse flow, iterate 3×
 - Reject where the structure tensor determinant is below threshold (aperture problem / flat regions) — write the confidence into flow.z
@@ -44,6 +57,11 @@ Ping-pong two particle buffers (read A, write B, swap) and two flow textures (pr
 - **NeuFlow-v2** — explicitly designed for edge latency, closest thing to a drop-in
 - A **distilled student**: train a tiny 4-level correlation net against RAFT-small pseudo-labels on FlyingChairs + a few thousand frames of your own webcam footage. Single rented GPU is enough for this; a small student on Chairs is hours, not days.
 - Whatever the current fast-flow SOTA is when you start — check before committing
+
+These are candidates, not an advance model selection. Before downloading model
+weights or datasets, accepting licenses, renting compute, training, or committing
+to an architecture, stop at human gate M3A with a current comparison of the
+options. Comparative accuracy and performance claims require M3B approval.
 
 If `onnx2wgsl` is done by then, **run the flow net through it.** The two projects compose, and "the network was compiled by my own compiler" is a strictly better post than either alone. If it isn't done, hand-write the kernels; a 4-level correlation net is maybe 15 ops.
 
@@ -73,6 +91,10 @@ Budget real time for masking and smoothing. This is where the demo goes from "in
 
 Aesthetic call worth making early: dark background, single-hue particles, and let *density* carry the image. Rainbow flow-direction coloring is more informative but reads as a debug view. Consider shipping both with a toggle and putting the pretty one in the video.
 
+This is explicitly a human aesthetic decision. An agent may implement controls
+and present options, but must not select the shipped look without M0/M1B human
+approval.
+
 ---
 
 ## 4. Second variant (cheap, doubles the reach)
@@ -80,6 +102,9 @@ Aesthetic call worth making early: dark background, single-hue particles, and le
 Once flow is in a texture, feed it to a **real motion-blur post pass** on rendered 3D geometry instead of particles. Pitch: *"your motion blur is using the world's actual optical flow, not the engine's velocity buffer."* Graphics people will argue about it, which is its own distribution channel.
 
 Cost: maybe a day, since the flow half already exists. Don't build it until the particle version has shipped.
+
+This variant is optional scope. Do not implement it merely because the particle
+version is complete; first stop at M4 and obtain a human scope decision.
 
 ---
 
@@ -98,21 +123,45 @@ Break down GPU time per stage using `timestamp-query`:
 
 Plus: flow resolution, particle count, frame time, device, browser. **Get the phone row.** WebGPU on Android Chrome is where the novelty gap is right now, and "no app, just a URL" is the strongest version of this claim.
 
+Benchmark rows must come from identified physical devices and browsers. Agents
+may collect and format measurements, but a human must verify them and approve
+the compatibility/performance policy at M2A and all public claims at M2B.
+
 **Accuracy table (Phase 2 only):** EPE on Sintel clean/final and KITTI-15 vs RAFT reference, alongside latency. This keeps the project honest and makes it citable rather than just pretty. Classical LK will lose badly on EPE — publish that anyway, it's the setup for the learned version's improvement.
 
 ---
 
 ## 6. Milestones
 
+This section is the high-level sequence. The authoritative acceptance criteria,
+stop conditions, and human gates are in [MILESTONES.md](./MILESTONES.md). A phase
+is not complete until its associated human gate is recorded as approved.
+
 **M0 — Moving pixels (2 days).** Camera → WebGPU texture, 512k particles, curl noise only, one encoder, instanced draw. *Exit: something beautiful on screen that has nothing to do with flow yet.*
+
+**Pause: HUMAN GATE M0** — approve the visual foundation and interaction before
+flow integration.
 
 **M1 — Flow, classical (4 days).** LK pyramid in WGSL, census transform, confidence mask, EMA, wired into advection. *Exit: waving your hand visibly drags particles, no mush. **This is the postable clip — record it here, not later.***
 
+**Pause: HUMAN GATES M1A and M1B** — test flow on real cameras, approve tuning,
+then approve the presentation aesthetic.
+
 **M2 — Ship (2 days).** Timing breakdown, phone build, GitHub Pages demo, README, 15-second wordless recording, post.
+
+**Pause: HUMAN GATES M2A and M2B** — set compatibility/performance policy, then
+verify claims and explicitly authorize deployment and publication. Agents may
+prepare release artifacts but must not publish them before approval.
 
 **M3 — Learned flow (5–7 days).** Swap in NeuFlow-v2 or a distilled student, EPE table, side-by-side comparison video, second post.
 
+**Pause twice:** M3A occurs before model/data acquisition, licensing, spending,
+or training; M3B occurs before publishing the learned-flow comparison.
+
 **M4 — Optional.** Motion-blur variant, depth × flow combined (scene flow-ish), MIDI/audio reactivity.
+
+**Pause: HUMAN GATE M4** — select and scope an optional variant before any
+implementation begins.
 
 Total to first post: ~8 days. Total to second post: ~3 weeks.
 
