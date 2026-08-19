@@ -119,7 +119,7 @@ export async function createRenderer({ device, context, format, video, particleC
   }));
   const debugGroups = filteredFlow.map((texture) => device.createBindGroup({
     layout: debugPipeline.getBindGroupLayout(0),
-    entries: [{ binding: 0, resource: texture.createView() }, { binding: 1, resource: { buffer: uniformBuffer } }],
+    entries: [{ binding: 0, resource: texture.createView() }],
   }));
 
   let particleSource = 0;
@@ -155,7 +155,6 @@ export async function createRenderer({ device, context, format, video, particleC
           entries: [
             { binding: 0, resource: device.importExternalTexture({ source: video }) },
             { binding: 1, resource: cameraSampler },
-            { binding: 2, resource: { buffer: uniformBuffer } },
           ],
         });
         grayPass.setPipeline(preprocessPipeline);

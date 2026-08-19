@@ -5,7 +5,6 @@ struct FlowFrame {
   flow_smoothing: f32, flow_clamp: f32, confidence_threshold: f32, debug_mode: f32,
 }
 @group(0) @binding(0) var flow: texture_2d<f32>;
-@group(0) @binding(1) var<uniform> frame: FlowFrame;
 
 struct Out { @builtin(position) position: vec4<f32>, @location(0) uv: vec2<f32> }
 @vertex fn vs(@builtin(vertex_index) i: u32) -> Out {
