@@ -137,7 +137,7 @@ export async function createRenderer({ device, context, format, video, particleC
         dt, time, width / height, params.pointSize,
         params.ambient, params.damping, effectiveGain, particleCount,
         width, height, FLOW_SIZES[0][0], FLOW_SIZES[0][1],
-        params.flowSmoothing, params.flowClamp, params.confidenceThreshold, params.showFlow,
+        params.flowSmoothing, params.flowClamp, params.confidenceThreshold, params.styleMode,
       ]));
 
       const encoder = device.createCommandEncoder({ label: "flowfield frame" });

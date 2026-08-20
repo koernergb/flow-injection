@@ -2,7 +2,7 @@ struct FlowFrame {
   dt: f32, time: f32, aspect: f32, point_size: f32,
   ambient: f32, damping: f32, flow_gain: f32, particle_count: f32,
   resolution: vec2<f32>, flow_resolution: vec2<f32>,
-  flow_smoothing: f32, flow_clamp: f32, confidence_threshold: f32, debug_mode: f32,
+  flow_smoothing: f32, flow_clamp: f32, confidence_threshold: f32, style_mode: f32,
 }
 @group(0) @binding(0) var flow: texture_2d<f32>;
 

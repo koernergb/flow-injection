@@ -2,7 +2,7 @@ struct FlowFrame {
   dt: f32, time: f32, aspect: f32, point_size: f32,
   ambient: f32, damping: f32, flow_gain: f32, particle_count: f32,
   resolution: vec2<f32>, flow_resolution: vec2<f32>,
-  flow_smoothing: f32, flow_clamp: f32, confidence_threshold: f32, debug_mode: f32,
+  flow_smoothing: f32, flow_clamp: f32, confidence_threshold: f32, style_mode: f32,
 }
 struct Particle {
   position: vec2<f32>, velocity: vec2<f32>, age: f32, lifetime: f32, seed: u32, _pad: u32,
@@ -43,18 +43,36 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
   var particle = source[index];
   let uv = particle.position * vec2<f32>(0.5, -0.5) + vec2<f32>(0.5);
   let sampled = bilinear_flow(uv);
+  let style = u32(round(frame.style_mode));
+  let style_gain = select(select(1.0, 1.25, style == 1u), 0.9, style == 2u);
+  let confidence_shape = select(sampled.z, sampled.z * sampled.z, style == 2u);
   let camera_velocity = vec2<f32>(
     sampled.x * 2.0 / frame.flow_resolution.x,
     sampled.y * -2.0 / frame.flow_resolution.y,
-  ) * frame.flow_gain * sampled.z;
-  let desired_velocity = camera_velocity + ambient_flow(particle.position, frame.time);
+  ) * frame.flow_gain * confidence_shape * style_gain;
+  let ambient_scale = select(select(1.0, 0.55, style == 1u), 0.18, style == 2u);
+  let desired_velocity = camera_velocity + ambient_flow(particle.position, frame.time) * ambient_scale;
   particle.velocity = particle.velocity * frame.damping + desired_velocity * frame.dt * 4.0;
   particle.position += particle.velocity * frame.dt;
   particle.age += frame.dt;
   let outside = any(abs(particle.position) > vec2<f32>(1.08));
   if (particle.age > particle.lifetime || outside) {
     particle.seed += 0x9e3779b9u;
-    particle.position = vec2<f32>(hash(particle.seed) * 2.0 - 1.0, hash(particle.seed ^ 0xa511e9b3u) * 2.0 - 1.0);
+    var respawn = vec2<f32>(hash(particle.seed) * 2.0 - 1.0, hash(particle.seed ^ 0xa511e9b3u) * 2.0 - 1.0);
+    if (style == 1u) {
+      var best_score = length(bilinear_flow(respawn * vec2<f32>(0.5, -0.5) + vec2<f32>(0.5)).xy);
+      for (var attempt = 1u; attempt < 4u; attempt += 1u) {
+        let attempt_seed = particle.seed + attempt * 0x85ebca6bu;
+        let candidate = vec2<f32>(hash(attempt_seed) * 2.0 - 1.0, hash(attempt_seed ^ 0xc2b2ae35u) * 2.0 - 1.0);
+        let candidate_flow = bilinear_flow(candidate * vec2<f32>(0.5, -0.5) + vec2<f32>(0.5));
+        let candidate_score = length(candidate_flow.xy) * candidate_flow.z;
+        if (candidate_score > best_score) {
+          respawn = candidate;
+          best_score = candidate_score;
+        }
+      }
+    }
+    particle.position = respawn;
     particle.velocity = vec2<f32>(0.0);
     particle.age = 0.0;
     particle.lifetime = 5.0 + hash(particle.seed ^ 0x63d83595u) * 8.0;

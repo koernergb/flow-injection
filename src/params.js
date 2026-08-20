@@ -7,6 +7,7 @@ export const defaults = Object.freeze({
   flowSmoothing: 0.7,
   flowClamp: 14,
   confidenceThreshold: 0.015,
+  styleMode: 0,
   showFlow: 0,
 });
 
@@ -18,6 +19,7 @@ const definitions = [
   ["flowSmoothing", "Flow smoothing", 0, 0.95, 0.01],
   ["flowClamp", "Flow clamp", 2, 30, 0.5],
   ["confidenceThreshold", "Confidence", 0, 0.1, 0.001],
+  ["styleMode", "Visual mode", 0, 2, 1],
   ["showFlow", "Flow debug", 0, 1, 1],
 ];
 
@@ -47,6 +49,7 @@ export function createControls(container, initial = defaults) {
 
 function format(key, value) {
   if (key === "damping" || key === "confidenceThreshold") return value.toFixed(3);
+  if (key === "styleMode") return ["ghost", "electric", "silhouette"][Math.round(value)];
   if (key === "showFlow") return value > 0 ? "on" : "off";
   return value.toFixed(2);
 }

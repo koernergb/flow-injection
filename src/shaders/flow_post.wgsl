@@ -12,7 +12,7 @@ struct FlowFrame {
   flow_smoothing: f32,
   flow_clamp: f32,
   confidence_threshold: f32,
-  debug_mode: f32,
+  style_mode: f32,
 }
 
 @group(0) @binding(0) var raw_flow: texture_2d<f32>;

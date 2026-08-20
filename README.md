@@ -48,6 +48,7 @@ blended. The webcam itself is not drawn.
 - camera-force gain
 - flow smoothing, clamp, and confidence threshold
 - optical-flow debug view
+- three live presentation modes: Ghost Current, Electric Flow, and Silhouette Field
 
 The defaults are proposals, not final design choices. Real-camera behavior must
 be reviewed at Human Gate M1A. See
