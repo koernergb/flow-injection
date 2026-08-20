@@ -66,8 +66,9 @@ Human Gate M2A review.
 
 ## Compatibility and privacy
 
-The primary camera path uses `device.importExternalTexture()`, currently best
-supported in Chromium-family WebGPU implementations. WebGPU availability,
+The primary camera path uses `device.importExternalTexture()`. The initial
+supported targets are Chromium-family desktop browsers and Android Chrome.
+Safari remains explicitly unverified until physical-device testing. WebGPU availability,
 external-texture behavior, timestamp queries, and sustained performance vary by
 browser and device; the release compatibility statement will be based on
 physical-device tests rather than assumed support.

@@ -29,9 +29,18 @@ This checklist prepares a release but does not authorize one.
 - [ ] Limitations of classical Lucas–Kanade flow are stated plainly.
 - [ ] Recording and post copy are approved by a human.
 
+## Approved performance policy
+
+- Target: 60 fps
+- Adaptive step-down threshold: below 50 fps
+- Adaptive step-up threshold: above 58 fps
+- Particle tiers: 65k, 131k, 197k, 262k
+- Initial support: Chromium desktop and Android Chrome
+- Safari: unverified until physical-device testing
+
 ## Publication
 
-- [ ] Human Gate M2A approved.
+- [x] Human Gate M2A approved.
 - [ ] Human Gate M2B explicitly authorizes deployment and publication.
 - [ ] GitHub Pages workflow dispatched manually only after M2B.
 - [ ] Release tag and public post created only after M2B.
