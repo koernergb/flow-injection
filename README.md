@@ -20,6 +20,12 @@ particle field continues without the camera ghost.
 
 Build a deployable static directory with `npm run build`.
 
+For phone testing on the same trusted local network, run `npm run dev:lan` and
+open `http://<computer-lan-ip>:4173` on the phone. This deliberately exposes the
+development server to the local network; stop it after testing. Camera access on
+a non-loopback HTTP origin may require a temporary HTTPS tunnel or the deployed
+Pages URL because browsers generally require a secure context for `getUserMedia`.
+
 ## Frame architecture
 
 Each animation frame is deliberately encoded in one readable function in

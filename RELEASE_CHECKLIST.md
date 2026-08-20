@@ -16,6 +16,7 @@ This checklist prepares a release but does not authorize one.
 
 - [ ] Desktop Chrome tested and recorded.
 - [ ] Android Chrome tested and recorded.
+- [ ] Phone camera test uses a secure context; plain LAN HTTP is not reported as a browser failure.
 - [ ] Safari tested or its limitation documented accurately.
 - [ ] Five-minute sustained performance and thermal behavior recorded.
 - [ ] Bright and dim lighting tested.
@@ -34,4 +35,3 @@ This checklist prepares a release but does not authorize one.
 - [ ] Human Gate M2B explicitly authorizes deployment and publication.
 - [ ] GitHub Pages workflow dispatched manually only after M2B.
 - [ ] Release tag and public post created only after M2B.
-

@@ -4,6 +4,7 @@ import { extname, join, normalize } from "node:path";
 
 const root = process.cwd();
 const port = Number(process.env.PORT ?? 4173);
+const host = process.env.FLOW_INJECTION_HOST ?? "127.0.0.1";
 const types = new Map([
   [".html", "text/html; charset=utf-8"],
   [".js", "text/javascript; charset=utf-8"],
@@ -24,6 +25,6 @@ createServer((request, response) => {
   response.setHeader("Content-Type", types.get(extname(file)) ?? "application/octet-stream");
   response.setHeader("Cache-Control", "no-store");
   createReadStream(file).pipe(response);
-}).listen(port, "127.0.0.1", () => {
-  process.stdout.write(`Flow Injection: http://127.0.0.1:${port}\n`);
+}).listen(port, host, () => {
+  process.stdout.write(`Flow Injection: http://${host}:${port}\n`);
 });
