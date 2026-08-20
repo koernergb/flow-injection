@@ -42,6 +42,7 @@ blended. The webcam itself is not drawn.
 
 ## Current controls
 
+- particle quality with an adaptive 60-fps policy
 - particle size
 - ambient motion strength
 - velocity damping
@@ -49,6 +50,29 @@ blended. The webcam itself is not drawn.
 - flow smoothing, clamp, and confidence threshold
 - optical-flow debug view
 - three live presentation modes: Ghost Current, Electric Flow, and Silhouette Field
+
+When the device supports WebGPU timestamp queries, the top-right readout reports
+total GPU time and exposes the per-stage breakdown on hover. Unsupported devices
+show `GPU n/a` without affecting the demo. The current adaptive policy steps
+between 65k, 131k, 197k, and 262k particles: it steps down below 50 fps and steps
+up above 58 fps, with a 2.5-second cooldown. This policy remains subject to
+Human Gate M2A review.
+
+## Compatibility and privacy
+
+The primary camera path uses `device.importExternalTexture()`, currently best
+supported in Chromium-family WebGPU implementations. WebGPU availability,
+external-texture behavior, timestamp queries, and sustained performance vary by
+browser and device; the release compatibility statement will be based on
+physical-device tests rather than assumed support.
+
+Camera frames stay inside the page. They are sampled into GPU textures and are
+not uploaded, recorded, stored, or read back to JavaScript. This repository has
+no analytics. Denying camera permission leaves the ambient particle field
+available, but optical-flow response naturally remains inactive.
+
+See [`BENCHMARKS.md`](./BENCHMARKS.md) for the measurement method and
+[`RELEASE_CHECKLIST.md`](./RELEASE_CHECKLIST.md) for the gated release process.
 
 The defaults are proposals, not final design choices. Real-camera behavior must
 be reviewed at Human Gate M1A. See

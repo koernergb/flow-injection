@@ -3,7 +3,7 @@ const PARTICLE_WORKGROUP = 256;
 const FLOW_WORKGROUP = 8;
 const FLOW_SIZES = [[160, 90], [80, 45], [40, 23], [20, 12]];
 
-export async function createRenderer({ device, context, format, video, particleCount }) {
+export async function createRenderer({ device, context, format, video, particleCount, hasTimestampQuery, onTimings }) {
   const sources = await loadShaders({
     preprocess: "./src/shaders/preprocess.wgsl",
     downsample: "./src/shaders/downsample.wgsl",
@@ -121,6 +121,8 @@ export async function createRenderer({ device, context, format, video, particleC
     layout: debugPipeline.getBindGroupLayout(0),
     entries: [{ binding: 0, resource: texture.createView() }],
   }));
+  const timing = hasTimestampQuery ? createGpuTiming(device, onTimings) : null;
+  if (!timing) onTimings?.(null);
 
   let particleSource = 0;
   let cameraDestination = 0;
@@ -129,13 +131,15 @@ export async function createRenderer({ device, context, format, video, particleC
 
   return {
     render({ dt, time, width, height, params }) {
+      timing?.beginFrame();
       const currentCamera = cameraDestination;
       const previousCamera = 1 - currentCamera;
       const nextFlow = 1 - flowSource;
       const effectiveGain = cameraFrames > 0 ? params.flowGain : 0;
+      const activeParticleCount = Math.min(particleCount, Math.round(params.particleCount));
       device.queue.writeBuffer(uniformBuffer, 0, new Float32Array([
         dt, time, width / height, params.pointSize,
-        params.ambient, params.damping, effectiveGain, particleCount,
+        params.ambient, params.damping, effectiveGain, activeParticleCount,
         width, height, FLOW_SIZES[0][0], FLOW_SIZES[0][1],
         params.flowSmoothing, params.flowClamp, params.confidenceThreshold, params.styleMode,
       ]));
@@ -144,6 +148,7 @@ export async function createRenderer({ device, context, format, video, particleC
 
       const grayPass = encoder.beginRenderPass({
         label: "camera to grayscale",
+        timestampWrites: timing?.writes("camera"),
         colorAttachments: [{
           view: pyramid[currentCamera][0].createView(),
           clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store",
@@ -163,7 +168,7 @@ export async function createRenderer({ device, context, format, video, particleC
       }
       grayPass.end();
 
-      const pyramidPass = encoder.beginComputePass({ label: "grayscale pyramid" });
+      const pyramidPass = encoder.beginComputePass({ label: "grayscale pyramid", timestampWrites: timing?.writes("pyramid") });
       pyramidPass.setPipeline(downsamplePipeline);
       for (let level = 1; level < FLOW_SIZES.length; level += 1) {
         pyramidPass.setBindGroup(0, downsampleGroups[currentCamera][level - 1]);
@@ -171,7 +176,7 @@ export async function createRenderer({ device, context, format, video, particleC
       }
       pyramidPass.end();
 
-      const flowPass = encoder.beginComputePass({ label: "coarse-to-fine LK" });
+      const flowPass = encoder.beginComputePass({ label: "coarse-to-fine LK", timestampWrites: timing?.writes("flow") });
       flowPass.setPipeline(lkPipeline);
       let passIndex = 0;
       for (let level = FLOW_SIZES.length - 1; level >= 0; level -= 1) {
@@ -197,21 +202,22 @@ export async function createRenderer({ device, context, format, video, particleC
       }
       flowPass.end();
 
-      const postPass = encoder.beginComputePass({ label: "flow post-process" });
+      const postPass = encoder.beginComputePass({ label: "flow post-process", timestampWrites: timing?.writes("flowPost") });
       postPass.setPipeline(postPipeline);
       postPass.setBindGroup(0, postGroups[flowSource]);
       dispatch2d(postPass, ...FLOW_SIZES[0]);
       postPass.end();
 
       const destinationParticle = 1 - particleSource;
-      const advectPass = encoder.beginComputePass({ label: "particle advection" });
+      const advectPass = encoder.beginComputePass({ label: "particle advection", timestampWrites: timing?.writes("advection") });
       advectPass.setPipeline(advectPipeline);
       advectPass.setBindGroup(0, advectGroups[particleSource][nextFlow]);
-      advectPass.dispatchWorkgroups(Math.ceil(particleCount / PARTICLE_WORKGROUP));
+      advectPass.dispatchWorkgroups(Math.ceil(activeParticleCount / PARTICLE_WORKGROUP));
       advectPass.end();
 
       const renderPass = encoder.beginRenderPass({
         label: "particle render",
+        timestampWrites: timing?.writes("draw"),
         colorAttachments: [{
           view: context.getCurrentTexture().createView(),
           clearValue: { r: 0.003, g: 0.007, b: 0.008, a: 1 }, loadOp: "clear", storeOp: "store",
@@ -224,10 +230,12 @@ export async function createRenderer({ device, context, format, video, particleC
       }
       renderPass.setPipeline(drawPipeline);
       renderPass.setBindGroup(0, drawGroups[destinationParticle]);
-      renderPass.draw(6, particleCount);
+      renderPass.draw(6, activeParticleCount);
       renderPass.end();
 
+      timing?.resolve(encoder);
       device.queue.submit([encoder.finish()]);
+      timing?.submitted();
       particleSource = destinationParticle;
       cameraDestination = previousCamera;
       flowSource = nextFlow;
@@ -240,6 +248,73 @@ export async function createRenderer({ device, context, format, video, particleC
       for (const levels of pyramid) for (const texture of levels) texture.destroy();
       for (const pair of levelFlow) for (const texture of pair) texture.destroy();
       for (const texture of filteredFlow) texture.destroy();
+      timing?.destroy();
+    },
+  };
+}
+
+function createGpuTiming(device, onTimings) {
+  const stages = ["camera", "pyramid", "flow", "flowPost", "advection", "draw"];
+  const queryCount = stages.length * 2;
+  const byteSize = queryCount * 8;
+  const querySet = device.createQuerySet({ type: "timestamp", count: queryCount });
+  const resolveBuffer = device.createBuffer({
+    size: byteSize,
+    usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
+  });
+  const readbacks = [0, 1].map(() => device.createBuffer({
+    size: byteSize,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+  }));
+  const busy = [false, false];
+  let frameIndex = 0;
+  let activeSlot = -1;
+  let destroyed = false;
+
+  return {
+    beginFrame() {
+      const candidate = Math.floor(frameIndex / 120) % readbacks.length;
+      activeSlot = frameIndex % 120 === 0 && !busy[candidate] ? candidate : -1;
+      frameIndex += 1;
+    },
+    writes(stage) {
+      if (activeSlot < 0) return undefined;
+      const index = stages.indexOf(stage) * 2;
+      return { querySet, beginningOfPassWriteIndex: index, endOfPassWriteIndex: index + 1 };
+    },
+    resolve(encoder) {
+      if (activeSlot < 0) return;
+      encoder.resolveQuerySet(querySet, 0, queryCount, resolveBuffer, 0);
+      encoder.copyBufferToBuffer(resolveBuffer, 0, readbacks[activeSlot], 0, byteSize);
+    },
+    submitted() {
+      if (activeSlot < 0) return;
+      const slot = activeSlot;
+      const buffer = readbacks[slot];
+      busy[slot] = true;
+      buffer.mapAsync(GPUMapMode.READ).then(() => {
+        if (destroyed) return;
+        const values = Array.from(new BigUint64Array(buffer.getMappedRange()), Number);
+        const ms = Object.fromEntries(stages.map((stage, index) => [stage, (values[index * 2 + 1] - values[index * 2]) / 1e6]));
+        const result = {
+          preprocess: ms.camera + ms.pyramid,
+          flow: ms.flow,
+          flowPost: ms.flowPost,
+          advection: ms.advection,
+          draw: ms.draw,
+        };
+        result.total = Object.values(result).reduce((sum, value) => sum + value, 0);
+        onTimings?.(result);
+      }).catch(() => {}).finally(() => {
+        if (buffer.mapState === "mapped") buffer.unmap();
+        busy[slot] = false;
+      });
+    },
+    destroy() {
+      destroyed = true;
+      querySet.destroy();
+      resolveBuffer.destroy();
+      for (const buffer of readbacks) buffer.destroy();
     },
   };
 }

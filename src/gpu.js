@@ -4,13 +4,16 @@ export async function createGpu(canvas) {
   const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
   if (!adapter) throw new Error("No compatible GPU adapter was found.");
 
-  const device = await adapter.requestDevice();
+  const hasTimestampQuery = adapter.features.has("timestamp-query");
+  const device = await adapter.requestDevice({
+    requiredFeatures: hasTimestampQuery ? ["timestamp-query"] : [],
+  });
   const context = canvas.getContext("webgpu");
   if (!context) throw new Error("Could not create a WebGPU canvas context.");
   const format = navigator.gpu.getPreferredCanvasFormat();
 
   context.configure({ device, format, alphaMode: "opaque" });
-  return { adapter, device, context, format };
+  return { adapter, device, context, format, hasTimestampQuery };
 }
 
 export function resizeCanvas(canvas, device) {

@@ -17,3 +17,4 @@
 - Default: Ghost Current
 - Additional modes: Electric Flow and Silhouette Field
 - Scope: the modes may vary palette, streak behavior, camera/ambient balance, and respawn strategy while preserving the same GPU flow pipeline and one-encoder frame.
+- Result: implemented and visually accepted by the project owner.

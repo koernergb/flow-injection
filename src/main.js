@@ -10,7 +10,9 @@ const statusTitle = document.querySelector("#status-title");
 const statusDetail = document.querySelector("#status-detail");
 const retry = document.querySelector("#retry");
 const fps = document.querySelector("#fps");
+const gpuTime = document.querySelector("#gpu-time");
 const cameraState = document.querySelector("#camera-state");
+const particleCountLabel = document.querySelector("#particle-count");
 const toggle = document.querySelector("#controls-toggle");
 const controlsBody = document.querySelector("#controls-body");
 const params = createControls(controlsBody);
@@ -50,12 +52,22 @@ async function boot() {
       ...gpu,
       video: camera.video,
       particleCount: defaults.particleCount,
+      onTimings(timings) {
+        if (!timings) {
+          gpuTime.value = "GPU n/a";
+          gpuTime.title = "Timestamp queries are unavailable on this device.";
+          return;
+        }
+        gpuTime.value = `GPU ${timings.total.toFixed(1)} ms`;
+        gpuTime.title = `preprocess ${timings.preprocess.toFixed(2)} · flow ${timings.flow.toFixed(2)} · post ${timings.flowPost.toFixed(2)} · advection ${timings.advection.toFixed(2)} · draw ${timings.draw.toFixed(2)} ms`;
+      },
     });
     let running = true;
     let animationFrame = 0;
     let previous = performance.now();
     let sampleStart = previous;
     let sampleFrames = 0;
+    let lastQualityChange = previous;
 
     cleanup = () => {
       running = false;
@@ -81,10 +93,21 @@ async function boot() {
         height: canvas.height,
         params,
       });
+      particleCountLabel.textContent = `${Math.round(params.particleCount).toLocaleString()} particles`;
 
       sampleFrames += 1;
       if (now - sampleStart >= 500) {
-        fps.value = `${Math.round(sampleFrames * 1000 / (now - sampleStart))} fps`;
+        const measuredFps = sampleFrames * 1000 / (now - sampleStart);
+        fps.value = `${Math.round(measuredFps)} fps`;
+        if (params.adaptiveQuality > 0 && now - lastQualityChange > 2500) {
+          if (measuredFps < 50 && params.particleCount > 65_536) {
+            params.set("particleCount", Math.max(65_536, params.particleCount - 65_536));
+            lastQualityChange = now;
+          } else if (measuredFps > 58 && params.particleCount < 262_144) {
+            params.set("particleCount", Math.min(262_144, params.particleCount + 65_536));
+            lastQualityChange = now;
+          }
+        }
         sampleFrames = 0;
         sampleStart = now;
       }

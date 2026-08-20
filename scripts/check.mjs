@@ -19,6 +19,14 @@ if (submitCount !== 1 || encoderCount !== 1) {
 if (!frame.includes("beginComputePass") || !frame.includes("beginRenderPass")) {
   throw new Error("frame.js must encode both compute and render passes");
 }
+if (!frame.includes("createQuerySet") || !frame.includes("resolveQuerySet")) {
+  throw new Error("M2 must retain optional GPU timestamp-query instrumentation");
+}
+
+const pagesWorkflow = readFileSync(".github/workflows/pages.yml", "utf8");
+if (!pagesWorkflow.includes("workflow_dispatch:") || /^\s+push:/m.test(pagesWorkflow)) {
+  throw new Error("Pages deployment must remain manual-only until Human Gate M2B");
+}
 
 const preprocessShader = readFileSync("src/shaders/preprocess.wgsl", "utf8");
 if (!preprocessShader.includes("texture_external") || !preprocessShader.includes("camera_sampler")) {
@@ -30,4 +38,4 @@ for (const file of files.filter((name) => name.endsWith(".js"))) {
   if (result.status !== 0) throw new Error(result.stderr);
 }
 
-process.stdout.write("M1 structural checks passed.\n");
+process.stdout.write("M2 structural checks passed.\n");

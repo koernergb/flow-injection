@@ -1,5 +1,6 @@
 export const defaults = Object.freeze({
   particleCount: 262_144,
+  adaptiveQuality: 1,
   pointSize: 2.2,
   ambient: 0.12,
   damping: 0.965,
@@ -12,6 +13,8 @@ export const defaults = Object.freeze({
 });
 
 const definitions = [
+  ["particleCount", "Particle quality", 65_536, 262_144, 65_536],
+  ["adaptiveQuality", "Adaptive quality", 0, 1, 1],
   ["pointSize", "Particle size", 0.8, 5, 0.1],
   ["ambient", "Ambient motion", 0, 1, 0.01],
   ["damping", "Damping", 0.85, 0.995, 0.001],
@@ -25,6 +28,7 @@ const definitions = [
 
 export function createControls(container, initial = defaults) {
   const values = { ...initial };
+  const controls = new Map();
 
   for (const [key, label, min, max, step] of definitions) {
     const row = document.createElement("label");
@@ -40,14 +44,28 @@ export function createControls(container, initial = defaults) {
       values[key] = Number(input.value);
       output.value = format(key, values[key]);
     });
+    controls.set(key, { input, output });
     row.append(name, output, input);
     container.append(row);
   }
+
+  Object.defineProperty(values, "set", {
+    enumerable: false,
+    value(key, value) {
+      const control = controls.get(key);
+      if (!control) return;
+      values[key] = value;
+      control.input.value = value;
+      control.output.value = format(key, value);
+    },
+  });
 
   return values;
 }
 
 function format(key, value) {
+  if (key === "particleCount") return ["low", "balanced", "high", "ultra"][Math.round(value / 65_536) - 1];
+  if (key === "adaptiveQuality") return value > 0 ? "auto" : "manual";
   if (key === "damping" || key === "confidenceThreshold") return value.toFixed(3);
   if (key === "styleMode") return ["ghost", "electric", "silhouette"][Math.round(value)];
   if (key === "showFlow") return value > 0 ? "on" : "off";
