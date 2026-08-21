@@ -1,0 +1,13 @@
+{
+  "name": "flow-injection",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "dev:lan": "FLOW_INJECTION_HOST=0.0.0.0 node scripts/serve.mjs",
+    "check": "node scripts/check.mjs",
+    "test": "node scripts/test-flow.mjs",
+    "build": "node scripts/build.mjs"
+  }
+}
