@@ -59,7 +59,7 @@ async function boot() {
           return;
         }
         gpuTime.value = `GPU ${timings.total.toFixed(1)} ms`;
-        gpuTime.title = `preprocess ${timings.preprocess.toFixed(2)} · flow ${timings.flow.toFixed(2)} · post ${timings.flowPost.toFixed(2)} · advection ${timings.advection.toFixed(2)} · draw ${timings.draw.toFixed(2)} ms`;
+        gpuTime.title = `preprocess ${timings.preprocess.toFixed(2)} · flow ${timings.flow.toFixed(2)} · post ${timings.flowPost.toFixed(2)} · advection ${timings.advection.toFixed(2)} · blur ${timings.blur.toFixed(2)} · draw ${timings.draw.toFixed(2)} ms`;
       },
     });
     let running = true;

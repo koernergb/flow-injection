@@ -10,6 +10,10 @@ export const defaults = Object.freeze({
   confidenceThreshold: 0.015,
   styleMode: 0,
   showFlow: 0,
+  motionBlur: 0,
+  blurStrength: 2,
+  blurQuality: 1,
+  blurEdgeRejection: 8,
 });
 
 const definitions = [
@@ -24,6 +28,10 @@ const definitions = [
   ["confidenceThreshold", "Confidence", 0, 0.1, 0.001],
   ["styleMode", "Visual mode", 0, 2, 1],
   ["showFlow", "Flow debug", 0, 1, 1],
+  ["motionBlur", "Real-world blur", 0, 1, 1],
+  ["blurStrength", "Blur shutter", 0, 6, 0.1],
+  ["blurQuality", "Blur quality", 0, 2, 1],
+  ["blurEdgeRejection", "Blur edge guard", 0, 20, 0.5],
 ];
 
 export function createControls(container, initial = defaults) {
@@ -69,5 +77,7 @@ function format(key, value) {
   if (key === "damping" || key === "confidenceThreshold") return value.toFixed(3);
   if (key === "styleMode") return ["ghost", "electric", "silhouette"][Math.round(value)];
   if (key === "showFlow") return value > 0 ? "on" : "off";
+  if (key === "motionBlur") return value > 0 ? "on" : "off";
+  if (key === "blurQuality") return ["5 taps", "9 taps", "13 taps"][Math.round(value)];
   return value.toFixed(2);
 }

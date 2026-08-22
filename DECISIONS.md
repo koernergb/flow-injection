@@ -31,3 +31,11 @@
 - Initial supported targets: Chromium-family desktop browsers and Android Chrome
 - Safari policy: describe as unverified until tested on physical hardware
 - Required follow-up: collect and verify desktop and phone benchmark rows before Human Gate M2B.
+
+### M4 local scope authorization
+
+- Date: 2026-08-20
+- Reviewer: project owner
+- Decision: authorize local implementation of both real-world motion blur and depth × flow.
+- Publication status: not authorized; M2B and M4R remain unresolved.
+- Required pauses: M4A after the blur prototype; M4B-Model before depth-weight acquisition; M4B-Visual after depth integration.

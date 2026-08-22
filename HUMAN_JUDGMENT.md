@@ -110,11 +110,18 @@ smoothness over density” are more actionable than implementation instructions.
 | M2B | Claims, privacy, deployment, publication | Any public release |
 | M3A | Model, data, licenses, cost | Learned-flow acquisition/training |
 | M3B | Accuracy/latency tradeoff and claims | Learned-flow release |
-| M4 | Optional feature scope | Optional variant implementation |
+| M4A | Motion-blur character and quality | Final blur tuning |
+| M4B-Model | Depth model, license, size, runtime | Weight acquisition and depth implementation |
+| M4B-Visual | Depth layering and boundary behavior | Final depth presentation |
+| M4R | Device results, privacy, terminology, publication | Variant release |
+
+M4's detailed test obligations and stop conditions are defined in
+[M4_PLAN.md](./M4_PLAN.md). In particular, a human must approve the difference
+between relative monocular depth, depth-conditioned flow, and full scene flow;
+an agent may not promote one term into another for a stronger public claim.
 
 ## Judgment record
 
 Human decisions should be written down with the tested commit, devices, browser
 versions, decision, selected settings, and requested follow-up. This prevents a
 later implementation pass from accidentally undoing an intentional choice.
-

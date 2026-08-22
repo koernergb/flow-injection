@@ -12,6 +12,8 @@ export async function createRenderer({ device, context, format, video, particleC
     advect: "./src/shaders/advect.wgsl",
     draw: "./src/shaders/draw.wgsl",
     debug: "./src/shaders/flow_debug.wgsl",
+    cameraColor: "./src/shaders/camera_color.wgsl",
+    blur: "./src/shaders/motion_blur.wgsl",
   });
   const modules = Object.fromEntries(await Promise.all(Object.entries(sources).map(async ([name, code]) => [
     name, await checkedShaderModule(device, name, code),
@@ -20,6 +22,11 @@ export async function createRenderer({ device, context, format, video, particleC
   const uniformBuffer = device.createBuffer({
     label: "frame uniforms",
     size: 64,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
+  const blurUniformBuffer = device.createBuffer({
+    label: "motion blur uniforms",
+    size: 32,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
   const particleBuffers = [0, 1].map((index) => device.createBuffer({
@@ -41,12 +48,22 @@ export async function createRenderer({ device, context, format, video, particleC
     label: `filtered flow ${index}`,
     width: FLOW_SIZES[0][0], height: FLOW_SIZES[0][1], format: "rgba16float",
   }));
+  const cameraColor = createTexture(device, {
+    label: "camera color frame", width: 640, height: 360, format: "rgba8unorm",
+  });
 
   const preprocessPipeline = device.createRenderPipeline({
     label: "camera grayscale",
     layout: "auto",
     vertex: { module: modules.preprocess, entryPoint: "vs" },
     fragment: { module: modules.preprocess, entryPoint: "fs", targets: [{ format: "rgba8unorm" }] },
+    primitive: { topology: "triangle-list" },
+  });
+  const cameraColorPipeline = device.createRenderPipeline({
+    label: "camera color capture",
+    layout: "auto",
+    vertex: { module: modules.cameraColor, entryPoint: "vs" },
+    fragment: { module: modules.cameraColor, entryPoint: "fs", targets: [{ format: "rgba8unorm" }] },
     primitive: { topology: "triangle-list" },
   });
   const downsamplePipeline = device.createComputePipeline({
@@ -82,6 +99,13 @@ export async function createRenderer({ device, context, format, video, particleC
     layout: "auto",
     vertex: { module: modules.debug, entryPoint: "vs" },
     fragment: { module: modules.debug, entryPoint: "fs", targets: [{ format }] },
+    primitive: { topology: "triangle-list" },
+  });
+  const blurPipeline = device.createRenderPipeline({
+    label: "camera-flow motion blur",
+    layout: "auto",
+    vertex: { module: modules.blur, entryPoint: "vs" },
+    fragment: { module: modules.blur, entryPoint: "fs", targets: [{ format }] },
     primitive: { topology: "triangle-list" },
   });
 
@@ -121,6 +145,15 @@ export async function createRenderer({ device, context, format, video, particleC
     layout: debugPipeline.getBindGroupLayout(0),
     entries: [{ binding: 0, resource: texture.createView() }],
   }));
+  const blurGroups = filteredFlow.map((texture) => device.createBindGroup({
+    layout: blurPipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: cameraColor.createView() },
+      { binding: 1, resource: texture.createView() },
+      { binding: 2, resource: cameraSampler },
+      { binding: 3, resource: { buffer: blurUniformBuffer } },
+    ],
+  }));
   const timing = hasTimestampQuery ? createGpuTiming(device, onTimings) : null;
   if (!timing) onTimings?.(null);
 
@@ -143,6 +176,10 @@ export async function createRenderer({ device, context, format, video, particleC
         width, height, FLOW_SIZES[0][0], FLOW_SIZES[0][1],
         params.flowSmoothing, params.flowClamp, params.confidenceThreshold, params.styleMode,
       ]));
+      device.queue.writeBuffer(blurUniformBuffer, 0, new Float32Array([
+        params.motionBlur, params.blurStrength, params.blurQuality, params.blurEdgeRejection,
+        640, 360, FLOW_SIZES[0][0], FLOW_SIZES[0][1],
+      ]));
 
       const encoder = device.createCommandEncoder({ label: "flowfield frame" });
 
@@ -154,11 +191,21 @@ export async function createRenderer({ device, context, format, video, particleC
           clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store",
         }],
       });
+      let cameraGroup = null;
+      let colorCameraGroup = null;
       if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-        const cameraGroup = device.createBindGroup({
+        const externalCamera = device.importExternalTexture({ source: video });
+        cameraGroup = device.createBindGroup({
           layout: preprocessPipeline.getBindGroupLayout(0),
           entries: [
-            { binding: 0, resource: device.importExternalTexture({ source: video }) },
+            { binding: 0, resource: externalCamera },
+            { binding: 1, resource: cameraSampler },
+          ],
+        });
+        colorCameraGroup = device.createBindGroup({
+          layout: cameraColorPipeline.getBindGroupLayout(0),
+          entries: [
+            { binding: 0, resource: externalCamera },
             { binding: 1, resource: cameraSampler },
           ],
         });
@@ -167,6 +214,21 @@ export async function createRenderer({ device, context, format, video, particleC
         grayPass.draw(3);
       }
       grayPass.end();
+
+      const colorPass = encoder.beginRenderPass({
+        label: "camera color capture",
+        timestampWrites: timing?.writes("cameraColor"),
+        colorAttachments: [{
+          view: cameraColor.createView(),
+          clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: "clear", storeOp: "store",
+        }],
+      });
+      if (colorCameraGroup) {
+        colorPass.setPipeline(cameraColorPipeline);
+        colorPass.setBindGroup(0, colorCameraGroup);
+        colorPass.draw(3);
+      }
+      colorPass.end();
 
       const pyramidPass = encoder.beginComputePass({ label: "grayscale pyramid", timestampWrites: timing?.writes("pyramid") });
       pyramidPass.setPipeline(downsamplePipeline);
@@ -215,12 +277,25 @@ export async function createRenderer({ device, context, format, video, particleC
       advectPass.dispatchWorkgroups(Math.ceil(activeParticleCount / PARTICLE_WORKGROUP));
       advectPass.end();
 
+      const blurPass = encoder.beginRenderPass({
+        label: "real-world motion blur",
+        timestampWrites: timing?.writes("blur"),
+        colorAttachments: [{
+          view: context.getCurrentTexture().createView(),
+          clearValue: { r: 0.003, g: 0.007, b: 0.008, a: 1 }, loadOp: "clear", storeOp: "store",
+        }],
+      });
+      blurPass.setPipeline(blurPipeline);
+      blurPass.setBindGroup(0, blurGroups[nextFlow]);
+      blurPass.draw(3);
+      blurPass.end();
+
       const renderPass = encoder.beginRenderPass({
         label: "particle render",
         timestampWrites: timing?.writes("draw"),
         colorAttachments: [{
           view: context.getCurrentTexture().createView(),
-          clearValue: { r: 0.003, g: 0.007, b: 0.008, a: 1 }, loadOp: "clear", storeOp: "store",
+          loadOp: "load", storeOp: "store",
         }],
       });
       if (params.showFlow > 0) {
@@ -243,18 +318,20 @@ export async function createRenderer({ device, context, format, video, particleC
     },
     destroy() {
       uniformBuffer.destroy();
+      blurUniformBuffer.destroy();
       for (const buffer of particleBuffers) buffer.destroy();
       for (const buffer of lkPasses) buffer.destroy();
       for (const levels of pyramid) for (const texture of levels) texture.destroy();
       for (const pair of levelFlow) for (const texture of pair) texture.destroy();
       for (const texture of filteredFlow) texture.destroy();
+      cameraColor.destroy();
       timing?.destroy();
     },
   };
 }
 
 function createGpuTiming(device, onTimings) {
-  const stages = ["camera", "pyramid", "flow", "flowPost", "advection", "draw"];
+  const stages = ["camera", "cameraColor", "pyramid", "flow", "flowPost", "advection", "blur", "draw"];
   const queryCount = stages.length * 2;
   const byteSize = queryCount * 8;
   const querySet = device.createQuerySet({ type: "timestamp", count: queryCount });
@@ -297,10 +374,11 @@ function createGpuTiming(device, onTimings) {
         const values = Array.from(new BigUint64Array(buffer.getMappedRange()), Number);
         const ms = Object.fromEntries(stages.map((stage, index) => [stage, (values[index * 2 + 1] - values[index * 2]) / 1e6]));
         const result = {
-          preprocess: ms.camera + ms.pyramid,
+          preprocess: ms.camera + ms.cameraColor + ms.pyramid,
           flow: ms.flow,
           flowPost: ms.flowPost,
           advection: ms.advection,
+          blur: ms.blur,
           draw: ms.draw,
         };
         result.total = Object.values(result).reduce((sum, value) => sum + value, 0);

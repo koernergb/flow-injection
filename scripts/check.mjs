@@ -7,6 +7,7 @@ const files = [
   "src/shaders/draw.wgsl", "src/shaders/preprocess.wgsl",
   "src/shaders/downsample.wgsl", "src/shaders/lk.wgsl",
   "src/shaders/flow_post.wgsl", "src/shaders/flow_debug.wgsl",
+  "src/shaders/camera_color.wgsl", "src/shaders/motion_blur.wgsl",
 ];
 for (const file of files) readFileSync(file, "utf8");
 

@@ -174,17 +174,24 @@ path and approves licenses, data sources, expected cost, and evaluation scope.
 accuracy improvement justifies the size and latency cost, and approves all
 comparative claims before release.
 
-## M4 — Optional variants
+## M4 — Real-world motion blur and depth × flow
 
-Motion blur, depth/flow combinations, MIDI, and audio reactivity are separate
-scope. Each requires a short proposal containing user value, estimated effort,
-performance cost, and impact on the project's core claim.
+The detailed design, staging, risks, and acceptance criteria are in
+[M4_PLAN.md](./M4_PLAN.md). M4 contains two independently usable tracks:
 
-### HUMAN GATE M4 — Scope selection
+- **M4A:** use measured camera flow as the velocity field for a confidence- and
+  edge-aware motion-blur post-process;
+- **M4B:** infer relative monocular depth and use depth, depth boundaries, and
+  optical flow to create a layered particle volume.
 
-**Agent must pause before implementing an optional variant.** A human chooses
-which proposal, if any, belongs in this repository and defines its acceptance
-criteria.
+M4B is depth-conditioned 2D motion, not full metric scene flow. Both tracks must
+preserve the classical-flow fallback and one-encoder/one-submit frame structure.
+
+### HUMAN GATES M4A, M4B-Model, M4B-Visual, and M4R
+
+**Agent must pause at every gate defined in M4_PLAN.md.** Human approval is
+required for blur character, depth model/license acquisition, depth aesthetics,
+and final release claims. Approval of one track does not approve the other.
 
 ## Decision record template
 
@@ -201,4 +208,3 @@ Append approved gate decisions to a project decision log or pull request using:
 - Observations:
 - Required follow-up:
 ```
-
