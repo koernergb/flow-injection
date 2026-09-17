@@ -158,10 +158,14 @@ prepare release artifacts but must not publish them before approval.
 **Pause twice:** M3A occurs before model/data acquisition, licensing, spending,
 or training; M3B occurs before publishing the learned-flow comparison.
 
-**M4 — Optional.** Motion-blur variant, depth × flow combined (scene flow-ish), MIDI/audio reactivity.
+**M4 — Camera motion blur and depth × flow.** Implement the two independently
+toggleable tracks described in [M4_PLAN.md](./M4_PLAN.md): measured-flow motion
+blur first, then relative monocular depth driving layered particles and
+occlusion boundaries. Do not describe the latter as full scene flow.
 
-**Pause: HUMAN GATE M4** — select and scope an optional variant before any
-implementation begins.
+**Pause: HUMAN GATES M4A, M4B-Model, M4B-Visual, and M4R** — approve blur
+character, depth model/license acquisition, depth presentation, and release
+claims at their respective stages.
 
 Total to first post: ~8 days. Total to second post: ~3 weeks.
 

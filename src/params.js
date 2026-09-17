@@ -10,6 +10,7 @@ export const defaults = Object.freeze({
   confidenceThreshold: 0.015,
   styleMode: 0,
   showFlow: 0,
+  dryWet: 1,
 });
 
 const definitions = [
@@ -23,7 +24,8 @@ const definitions = [
   ["flowClamp", "Flow clamp", 2, 30, 0.5],
   ["confidenceThreshold", "Confidence", 0, 0.1, 0.001],
   ["styleMode", "Visual mode", 0, 2, 1],
-  ["showFlow", "Flow debug", 0, 1, 1],
+  ["showFlow", "Colored flow field", 0, 1, 1],
+  ["dryWet", "Dry / wet", 0, 1, 0.01],
 ];
 
 export function createControls(container, initial = defaults) {

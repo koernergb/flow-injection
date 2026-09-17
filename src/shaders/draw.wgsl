@@ -13,6 +13,10 @@ struct Frame {
   flow_clamp: f32,
   confidence_threshold: f32,
   style_mode: f32,
+  dry_wet: f32,
+  _frame_pad_0: f32,
+  _frame_pad_1: f32,
+  _frame_pad_2: f32,
 }
 
 struct Particle {
@@ -74,5 +78,5 @@ fn fs(input: VertexOutput) -> @location(0) vec4<f32> {
     color = vec3<f32>(0.9, 0.96, 1.0);
     intensity = shape * smoothstep(0.001, 0.018, input.speed) * (0.08 + min(input.speed * 14.0, 0.7));
   }
-  return vec4<f32>(color, intensity);
+  return vec4<f32>(color, intensity * clamp(frame.dry_wet, 0.0, 1.0));
 }

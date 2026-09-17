@@ -1,94 +1,157 @@
 # Flow Injection
 
-Flow Injection is a WebGPU experiment that turns webcam motion into a velocity
-field for hundreds of thousands of GPU particles. The M1 build computes a
-four-level pyramidal Lucas–Kanade flow field and consumes it during particle
-advection without reading camera or flow data back to the CPU.
+> Your movement becomes a GPU velocity field.
 
-## Run it
+Flow Injection turns live webcam motion into a field that drives hundreds of
+thousands of particles in real time. Camera preprocessing, pyramidal
+Lucas–Kanade optical flow, confidence filtering, particle advection, composition,
+and drawing all happen on the GPU inside **one command encoder and one queue
+submission per frame**.
 
-Requirements: a current WebGPU-capable browser and Node.js 20 or newer.
+No server inference. No camera upload. No CPU readback of the flow field.
+
+## What it looks like
+
+Move in front of the camera and the particle field follows. The presentation can
+shift continuously from the untouched webcam to the generated effect with the
+**Dry / wet** control.
+
+- **Ghost Current** — restrained, luminous currents on a dark field
+- **Electric Flow** — direction-colored energy and longer streaks
+- **Silhouette Field** — compact white motion that emphasizes the subject
+- **Colored flow field** — the motion estimate itself, colored by direction and
+  weighted by confidence
+
+## Run locally
+
+Requirements: Node.js 20+ and a current WebGPU-capable browser.
 
 ```bash
 npm run check
+npm test
 npm run dev
 ```
 
-Open <http://127.0.0.1:4173> and allow camera access. Camera frames are sampled
-locally by WebGPU and are never uploaded. If permission is denied, the ambient
-particle field continues without the camera ghost.
+Open [http://127.0.0.1:4173](http://127.0.0.1:4173), allow camera access, and
+open **Tune**. Build a deployable static directory with:
 
-Build a deployable static directory with `npm run build`.
+```bash
+npm run build
+```
 
-For phone testing on the same trusted local network, run `npm run dev:lan` and
-open `http://<computer-lan-ip>:4173` on the phone. This deliberately exposes the
-development server to the local network; stop it after testing. Camera access on
-a non-loopback HTTP origin may require a temporary HTTPS tunnel or the deployed
-Pages URL because browsers generally require a secure context for `getUserMedia`.
+For testing on another device on a trusted local network:
+
+```bash
+npm run dev:lan
+```
+
+Then open `http://<computer-lan-ip>:4173`. Browsers generally require a secure
+context for camera access, so a phone may require an HTTPS preview or deployed
+URL instead of plain LAN HTTP. Stop the LAN server when testing is complete.
 
 ## Frame architecture
 
-Each animation frame is deliberately encoded in one readable function in
-[`src/frame.js`](./src/frame.js):
+Every animation frame is assembled in [`src/frame.js`](./src/frame.js):
+
+```text
+webcam ──┬─→ color capture ───────────────────────────────┐
+         │                                                │
+         └─→ grayscale pyramid → optical flow → filter    │
+                                          │               │
+                                          └─→ particles   │
+                                                          ↓
+                          dry/wet composite → particle draw → screen
+```
 
 ```js
 const encoder = device.createCommandEncoder();
-// render: camera → grayscale texture
+// render: camera → grayscale and color textures
 // compute: pyramid → LK flow → EMA/confidence → particle A → B
-// render: instanced particle quads
+// render: dry/wet composite → optional colored flow field → particles
 device.queue.submit([encoder.finish()]);
 ```
 
-Two 32-byte particle storage buffers ping-pong between compute and rendering.
-The webcam is imported as a GPU external texture and immediately converted to a
-160×90 grayscale pyramid. Three LK refinements run at each of four levels. The
-filtered flow texture is bilinearly sampled by particle positions. Every
-particle is an instanced quad stretched along its velocity vector and additively
-blended. The webcam itself is not drawn.
+The main pieces are:
 
-## Current controls
+| Stage | Implementation |
+|---|---|
+| Camera | Imported as a GPU external texture |
+| Pyramid | Four grayscale levels: 160×90 down to 20×12 |
+| Flow | Three Lucas–Kanade refinements per level, coarse to fine |
+| Stability | Structure-tensor confidence, temporal EMA, magnitude clamp |
+| Particles | Ping-pong storage buffers with bilinear flow sampling |
+| Drawing | Instanced velocity-stretched quads with additive blending |
+| Composition | Webcam-to-effect dry/wet blend on the GPU |
 
-- particle quality with an adaptive 60-fps policy
-- particle size
-- ambient motion strength
-- velocity damping
-- camera-force gain
-- flow smoothing, clamp, and confidence threshold
-- optical-flow debug view
-- three live presentation modes: Ghost Current, Electric Flow, and Silhouette Field
+## Controls
 
-When the device supports WebGPU timestamp queries, the top-right readout reports
-total GPU time and exposes the per-stage breakdown on hover. Unsupported devices
-show `GPU n/a` without affecting the demo. The current adaptive policy steps
-between 65k, 131k, 197k, and 262k particles: it steps down below 50 fps and steps
-up above 58 fps, with a 2.5-second cooldown. This policy remains subject to
-Human Gate M2A review.
+| Control | Purpose |
+|---|---|
+| Particle quality | 65k, 131k, 197k, or 262k particles |
+| Adaptive quality | Holds the approved frame-rate policy automatically |
+| Particle size | Changes particle and streak width |
+| Ambient motion | Keeps the field alive when the scene is still |
+| Damping | Controls particle momentum |
+| Camera force | Scales webcam-derived motion |
+| Flow smoothing | Trades immediate response for stability |
+| Flow clamp | Limits extreme motion estimates |
+| Confidence | Rejects unreliable flow regions |
+| Visual mode | Switches among Ghost, Electric, and Silhouette |
+| Colored flow field | Displays direction-colored optical flow |
+| Dry / wet | Blends from raw webcam to the generated presentation |
+
+The Tune panel scrolls independently on smaller screens. When timestamp queries
+are available, hover the GPU timing readout for the per-stage breakdown.
+
+## Performance policy
+
+Adaptive quality targets 60 fps. It steps down when measured performance falls
+below 50 fps and steps up above 58 fps, with a 2.5-second cooldown. Current tiers
+are 65,536, 131,072, 196,608, and 262,144 particles.
+
+These are implementation settings, not universal performance claims. Sustained
+desktop and Android measurements remain intentionally blank until they are
+verified on named physical devices. See [`BENCHMARKS.md`](./BENCHMARKS.md).
 
 ## Compatibility and privacy
 
-The primary camera path uses `device.importExternalTexture()`. The initial
-supported targets are Chromium-family desktop browsers and Android Chrome.
-Safari remains explicitly unverified until physical-device testing. WebGPU availability,
-external-texture behavior, timestamp queries, and sustained performance vary by
-browser and device; the release compatibility statement will be based on
-physical-device tests rather than assumed support.
+The initial targets are Chromium-family desktop browsers and Android Chrome.
+Safari is unverified. WebGPU support, external-texture behavior, timestamp
+queries, and sustained performance vary by browser and hardware.
 
 Camera frames stay inside the page. They are sampled into GPU textures and are
 not uploaded, recorded, stored, or read back to JavaScript. This repository has
-no analytics. Denying camera permission leaves the ambient particle field
-available, but optical-flow response naturally remains inactive.
+no analytics. If camera permission is denied, ambient particles remain available
+but camera-driven motion and the dry webcam view do not.
 
-See [`BENCHMARKS.md`](./BENCHMARKS.md) for the measurement method and
-[`RELEASE_CHECKLIST.md`](./RELEASE_CHECKLIST.md) for the gated release process.
+## Project status
 
-The defaults are proposals, not final design choices. Real-camera behavior must
-be reviewed at Human Gate M1A. See
-[`MILESTONES.md`](./MILESTONES.md) and [`HUMAN_JUDGMENT.md`](./HUMAN_JUDGMENT.md).
+The classical optical-flow pipeline and three particle presentations have passed
+their visual gates. The compatibility policy is approved; verified physical-device
+benchmarks and public-release authorization remain pending. Optional learned-flow
+and depth-conditioned variants have separate decision gates.
 
-## M1A review
+- [`MILESTONES.md`](./MILESTONES.md) — implementation sequence and evidence
+- [`HUMAN_JUDGMENT.md`](./HUMAN_JUDGMENT.md) — decisions agents must not make
+- [`DECISIONS.md`](./DECISIONS.md) — recorded approvals
+- [`M4_PLAN.md`](./M4_PLAN.md) — optional depth/flow research plan
+- [`RELEASE_CHECKLIST.md`](./RELEASE_CHECKLIST.md) — publication requirements
 
-Run the demo in two lighting conditions. Wave a hand horizontally and vertically,
-then hold still. Toggle Flow debug to inspect direction, magnitude, and
-confidence. Evaluate whether motion is legible, stable, and responsive without
-the field drifting or exploding. Record the decision using the M1A template in
-`MILESTONES.md`.
+## Repository map
+
+```text
+src/
+├── frame.js                 # the single-encoder frame graph
+├── camera.js                # local webcam acquisition
+├── gpu.js                   # WebGPU setup and canvas sizing
+├── params.js                # live Tune controls
+└── shaders/
+    ├── preprocess.wgsl      # camera → grayscale
+    ├── downsample.wgsl      # image pyramid
+    ├── lk.wgsl              # coarse-to-fine optical flow
+    ├── flow_post.wgsl       # confidence, smoothing, clamp
+    ├── advect.wgsl          # particle simulation
+    ├── composite.wgsl       # dry/wet camera composition
+    ├── flow_debug.wgsl      # colored flow-field presentation
+    └── draw.wgsl            # particle rendering
+```
